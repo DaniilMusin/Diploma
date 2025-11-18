@@ -1,0 +1,38 @@
+# Основные зависимости для дипломного проекта
+# Установка: pip install -r requirements.txt
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Научные вычисления
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Обработка изображений
+pillow>=9.5.0
+opencv-python>=4.7.0
+
+# Машинное обучение
+scikit-learn>=1.2.0
+
+# Визуализация
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# GUI
+PyQt5>=5.15.0
+
+# Работа с данными
+pandas>=2.0.0
+
+# Работа с устройствами
+pyserial>=3.5
+
+# Jupyter
+jupyter>=1.0.0
+ipykernel>=6.22.0
+notebook>=6.5.0
+
+# Утилиты
+tqdm>=4.65.0
