@@ -20,19 +20,50 @@ model_paths = {
 }
 
 class TestDataset(Dataset):
-    def __init__(self, csv_file, img_dir):
+    def __init__(
+        self,
+        csv_file,
+        img_dir,
+        split_column="split",
+        test_split_value="test",
+        exclude_filenames=None,
+    ):
         self.file_info = []
         self.img_dir = img_dir
-        
-        # Чтение CSV-файла
-        with open(csv_file, 'r', encoding='utf-8') as f:
-            next(f)  # Пропуск заголовка
-            for line in f:
-                parts = line.strip().split(',')
-                if len(parts) >= 2:
-                    filename = parts[0].strip()
-                    label = int(parts[1].strip())
-                    self.file_info.append((filename, label))
+
+        if not os.path.exists(csv_file):
+            raise FileNotFoundError(f"Не найден тестовый CSV-файл: {csv_file}")
+
+        csv_df = pd.read_csv(csv_file)
+        if "filename" not in csv_df.columns or "label" not in csv_df.columns:
+            raise ValueError("CSV должен содержать столбцы 'filename' и 'label'")
+
+        exclude_filenames = set(exclude_filenames or [])
+        if exclude_filenames:
+            initial_count = len(csv_df)
+            csv_df = csv_df[~csv_df["filename"].isin(exclude_filenames)]
+            print(
+                f"   Исключено {initial_count - len(csv_df)} изображений, относящихся к обучению"
+            )
+
+        if split_column in csv_df.columns:
+            before_filter = len(csv_df)
+            csv_df = csv_df[
+                csv_df[split_column].astype(str).str.lower() == test_split_value.lower()
+            ]
+            print(
+                f"   Отфильтровано по split='{test_split_value}': {before_filter} -> {len(csv_df)}"
+            )
+        elif not exclude_filenames:
+            raise ValueError(
+                "CSV не содержит столбец split и не передан список исключений – "
+                "невозможно гарантировать отделение тренировочных данных"
+            )
+
+        for _, row in csv_df.iterrows():
+            filename = str(row["filename"]).strip()
+            label = int(row["label"])
+            self.file_info.append((filename, label))
     
     def __len__(self):
         return len(self.file_info)
@@ -142,14 +173,40 @@ def plot_confusion_matrix(cm, class_names):
     plt.savefig('confusion_matrix.png')
     plt.close()
 
+def load_excluded_filenames(csv_path):
+    if not csv_path or not os.path.exists(csv_path):
+        return set()
+
+    csv_df = pd.read_csv(csv_path)
+    if "filename" not in csv_df.columns:
+        return set()
+
+    return set(csv_df["filename"].astype(str).str.strip())
+
+
 def evaluate_ensemble():
     # Пути к тестовым данным
-    csv_path = "D:/Diploma/labels_Denis.csv"
-    img_dir = "D:/Diploma/Plates/Processed_Grayscale_Images"
+    csv_path = os.environ.get("TEST_CSV_PATH", "D:/Diploma/labels_Denis_test.csv")
+    train_csv_path = os.environ.get("TRAIN_CSV_PATH")
+    split_column = os.environ.get("SPLIT_COLUMN", "split")
+    test_split_value = os.environ.get("TEST_SPLIT_VALUE", "test")
+    img_dir = os.environ.get("TEST_IMG_DIR", "D:/Diploma/Plates/Processed_Grayscale_Images")
+
+    excluded_train_files = load_excluded_filenames(train_csv_path)
+    if train_csv_path and not excluded_train_files:
+        print(
+            "Предупреждение: Не удалось прочитать обучающие файлы для исключения из теста"
+        )
     
     # Загрузка тестового набора
     print("\n1. Загрузка тестового набора...")
-    test_dataset = TestDataset(csv_path, img_dir)
+    test_dataset = TestDataset(
+        csv_path,
+        img_dir,
+        split_column=split_column,
+        test_split_value=test_split_value,
+        exclude_filenames=excluded_train_files,
+    )
     print(f"   Найдено {len(test_dataset)} тестовых изображений")
     
     # Инициализация устройства
